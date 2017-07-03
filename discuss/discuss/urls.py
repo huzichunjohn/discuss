@@ -21,7 +21,7 @@ from django.contrib.auth.views import logout
 from django.views.generic import TemplateView
 
 from accounts.views import UserRegistrationView
-from links.views import NewSubmissionView, SubmissionDetailView, NewCommentView
+from links.views import NewSubmissionView, SubmissionDetailView, NewCommentView, NewCommentReplyView
 
 urlpatterns = [
     url(r'^admin/', admin.site.urls),
@@ -34,4 +34,5 @@ urlpatterns = [
     url(r'^new-submission/$', NewSubmissionView.as_view(), name='new-submission'),
     url(r'^submission/(?P<pk>\d+)/$', SubmissionDetailView.as_view(), name='submission-detail'),
     url(r'^new-comment/$', NewCommentView.as_view(), name='new-comment'),
+    url(r'^new-comment-reply/$', NewCommentReplyView.as_view(), name='new-comment-reply'),
 ]

@@ -39,7 +39,7 @@ class SubmissionDetailView(DetailView):
     def get_context_data(self, **kwargs):
         ctx = super(SubmissionDetailView, self).get_context_data(**kwargs)
 
-        submission_comments = Comment.objects.filter(commented_on=self.object)
+        submission_comments = Comment.objects.filter(commented_on=self.object, in_reply_to__isnull=True)
         ctx['comments'] = submission_comments
         ctx['comment_form'] = CommentModelForm(initial={'link_pk': self.object.pk})
 
@@ -68,9 +68,47 @@ class NewCommentView(CreateView):
     def get_initial(self):
         initial_data = super(NewCommentView, self).get_initial()
         initial_data['link_pk'] = self.request.GET['link_pk']
+        return initial_data
 
     def get_context_data(self, **kwargs):
         ctx = super(NewCommentView, self).get_context_data(**kwargs)
         ctx['submission'] = Link.objects.get(pk=self.request.GET['link_pk'])
 
         return ctx
+
+class NewCommentReplyView(CreateView):
+    form_class = CommentModelForm
+    template_name = 'comment_reply.html'
+
+    @method_decorator(login_required)
+    def dispatch(self, request, *args, **kwargs):
+        return super(NewCommentReplyView, self).dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        ctx = super(NewCommentReplyView, self).get_context_data(**kwargs)
+        ctx['parent_comment'] = Comment.objects.get(pk=self.request.GET['parent_comment_pk'])
+        return ctx
+
+    def get_initial(self):
+        initial_data = super(NewCommentReplyView, self).get_initial()
+
+        link_pk = self.request.GET['link_pk']
+        initial_data['link_pk'] = link_pk
+
+        parent_comment_pk = self.request.GET['parent_comment_pk']
+        initial_data['parent_comment_pk'] = parent_comment_pk
+
+        return initial_data
+
+    def form_valid(self, form):
+        parent_link = Link.objects.get(pk=form.cleaned_data['link_pk'])
+        parent_comment = Comment.objects.get(pk=form.cleaned_data['parent_comment_pk'])
+
+        new_comment = form.save(commit=False)
+        new_comment.commented_on = parent_link
+        new_comment.in_reply_to = parent_comment
+        new_comment.commented_by = self.request.user
+
+        new_comment.save()
+
+        return HttpResponseRedirect(reverse('submission-detail', kwargs={'pk': parent_link.pk}))
