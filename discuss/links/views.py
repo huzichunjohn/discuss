@@ -5,7 +5,8 @@ from django.contrib.auth.decorators import login_required
 from django.core.urlresolvers import reverse
 from django.http.response import HttpResponseRedirect
 from django.utils.decorators import method_decorator
-from django.views.generic import CreateView, DetailView
+from django.views.generic import CreateView, DetailView, TemplateView, View
+from django.utils import timezone
 
 from links.models import Link, Comment
 from links.forms import CommentModelForm
@@ -112,3 +113,39 @@ class NewCommentReplyView(CreateView):
         new_comment.save()
 
         return HttpResponseRedirect(reverse('submission-detail', kwargs={'pk': parent_link.pk}))
+
+class HomeView(TemplateView):
+    template_name = 'home.html'
+
+    def get_context_data(self, **kwargs):
+        ctx = super(HomeView, self).get_context_data(**kwargs)
+
+        now = timezone.now()
+        submissions = Link.objects.all()
+        for submission in submissions:
+            num_votes = submission.upvotes.count()
+            num_comments = submission.comment_set.count()
+
+            date_diff = now - submission.submitted_on
+            number_of_days_since_submission = date_diff.days
+
+            submission.rank = num_votes + num_comments - number_of_days_since_submission
+
+        sorted_submissions = sorted(submissions, key=lambda x: x.rank, reverse=True)
+        ctx['submissions'] = sorted_submissions
+
+        return ctx
+
+class UpvoteSubmissionView(View):
+    def get(self, request, link_pk, **kwargs):
+        link = Link.objects.get(pk=link_pk)
+        link.upvotes.add(request.user)
+
+        return HttpResponseRedirect(reverse('home'))
+
+class RemoveUpvoteFromSubmissionView(View):
+    def get(self, request, link_pk, **kwargs):
+        link = Link.objects.get(pk=link_pk)
+        link.upvotes.remove(request.user)
+
+        return HttpResponseRedirect(reverse('home'))
